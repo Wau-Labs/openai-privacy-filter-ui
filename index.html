@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Filter Playground</title>
+<meta name="description" content="Test OpenAI Privacy Filter (openai/privacy-filter) PII detection and redaction entirely in your browser with Transformers.js.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #e2e5ea;
+  --text: #15181d;
+  --muted: #5d6573;
+  --accent: #2f5bea;
+  --accent-ink: #ffffff;
+  --danger: #c4372c;
+  --ok: #1d8a4e;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  --radius: 12px;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --c-account_number: #b45309;  --c-account_number-bg: #fdecd3;
+  --c-private_address: #0f766e; --c-private_address-bg: #d3f2ee;
+  --c-private_date: #7c3aed;    --c-private_date-bg: #ebe2fd;
+  --c-private_email: #1d4ed8;   --c-private_email-bg: #dce6fd;
+  --c-private_person: #be185d;  --c-private_person-bg: #fbdcea;
+  --c-private_phone: #15803d;   --c-private_phone-bg: #d8f3e0;
+  --c-private_url: #0369a1;     --c-private_url-bg: #d6ecf8;
+  --c-secret: #b91c1c;          --c-secret-bg: #fbdcdc;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --border: #2a2f39;
+    --text: #e7e9ee; --muted: #9aa3b2; --accent: #6d8dff; --accent-ink: #0b0d12;
+    --danger: #ff7b6e; --ok: #4ccf86;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --c-account_number: #fbbf62;  --c-account_number-bg: #3d2a0d;
+    --c-private_address: #4fd6c6; --c-private_address-bg: #0e3532;
+    --c-private_date: #b9a0ff;    --c-private_date-bg: #2c2147;
+    --c-private_email: #8fb0ff;   --c-private_email-bg: #1b2a52;
+    --c-private_person: #ff8fc2;  --c-private_person-bg: #4a1630;
+    --c-private_phone: #6ee59a;   --c-private_phone-bg: #12391f;
+    --c-private_url: #74c6f2;     --c-private_url-bg: #0f3247;
+    --c-secret: #ff8a8a;          --c-secret-bg: #4a1717;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --surface: #171a20; --surface-2: #1e222a; --border: #2a2f39;
+  --text: #e7e9ee; --muted: #9aa3b2; --accent: #6d8dff; --accent-ink: #0b0d12;
+  --danger: #ff7b6e; --ok: #4ccf86;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
+  --c-account_number: #fbbf62;  --c-account_number-bg: #3d2a0d;
+  --c-private_address: #4fd6c6; --c-private_address-bg: #0e3532;
+  --c-private_date: #b9a0ff;    --c-private_date-bg: #2c2147;
+  --c-private_email: #8fb0ff;   --c-private_email-bg: #1b2a52;
+  --c-private_person: #ff8fc2;  --c-private_person-bg: #4a1630;
+  --c-private_phone: #6ee59a;   --c-private_phone-bg: #12391f;
+  --c-private_url: #74c6f2;     --c-private_url-bg: #0f3247;
+  --c-secret: #ff8a8a;          --c-secret-bg: #4a1717;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.55 Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button, select, input, textarea { font: inherit; color: inherit; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 64px; }
+header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+header.top h1 { font-size: 24px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -.01em; }
+header.top p { margin: 0; color: var(--muted); max-width: 720px; }
+.links { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 14px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.card-h h2 { font-size: 14px; font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.card-b { padding: 16px; }
+
+.model-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+select, input[type="number"] {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; min-height: 36px;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px;
+  padding: 7px 14px; min-height: 36px; cursor: pointer; font-weight: 500; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.sm { padding: 4px 10px; min-height: 30px; font-size: 13px; }
+.btn.ghost { background: transparent; }
+
+.status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--ok); } .dot.err { background: var(--danger); } .dot.busy { background: var(--accent); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.progress { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; margin-top: 10px; display: none; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+textarea {
+  width: 100%; min-height: 320px; resize: vertical; display: block;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; font-family: var(--mono); font-size: 13.5px; line-height: 1.6;
+}
+textarea:focus, select:focus, input:focus, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.samples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.hint { font-size: 12.5px; color: var(--muted); }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--surface-2); }
+
+.tabs { display: flex; gap: 2px; background: var(--surface-2); padding: 3px; border-radius: 9px; }
+.tab { border: 0; background: transparent; padding: 5px 12px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+.out {
+  min-height: 320px; max-height: 560px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; font-family: var(--mono); font-size: 13.5px; line-height: 1.75;
+}
+.out.empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-family: inherit; text-align: center; white-space: normal; }
+mark.ent {
+  color: var(--c); background: var(--bg-c); border-radius: 4px; padding: 1px 2px;
+  box-shadow: inset 0 -2px 0 var(--c); cursor: help;
+}
+mark.ent .tag { font-size: 10px; font-weight: 600; letter-spacing: .03em; margin-left: 4px; text-transform: uppercase; opacity: .85; font-family: Inter, sans-serif; }
+.redact { color: var(--c); background: var(--bg-c); border-radius: 4px; padding: 1px 3px; font-weight: 500; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px;
+  border: 1px solid var(--border); background: var(--surface); font-size: 12.5px; cursor: pointer; user-select: none;
+}
+.chip .sw { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.chip .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--surface-2); }
+td.mono { font-family: var(--mono); word-break: break-all; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 600; color: var(--c); background: var(--bg-c); padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.bar { height: 4px; width: 60px; background: var(--border); border-radius: 99px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+.bar > i { display: block; height: 100%; background: var(--ok); }
+
+.stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.stats b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+details.adv { margin-top: 16px; }
+details.adv > summary { cursor: pointer; padding: 14px 16px; font-weight: 600; font-size: 14px; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.adv > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+details.adv[open] > summary::before { transform: rotate(90deg); }
+details.adv > summary::-webkit-details-marker { display: none; }
+.adv-body { padding: 0 16px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 20px; }
+.slider label { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 2px; }
+.slider label output { font-family: var(--mono); color: var(--text); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.adv-foot { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.notice { margin-top: 12px; font-size: 13px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
+.notice.err { color: var(--danger); border-color: var(--danger); }
+footer { margin-top: 28px; font-size: 12.5px; color: var(--muted); }
+.icon-btn { background: transparent; border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; cursor: pointer; flex: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Privacy Filter Playground</h1>
+      <p>Detect and redact PII with <a href="https://huggingface.co/openai/privacy-filter" target="_blank" rel="noopener">openai/privacy-filter</a>. The model runs entirely in your browser via Transformers.js (WebGPU or WASM). Your text never leaves this device.</p>
+      <div class="links">
+        <a href="https://huggingface.co/openai/privacy-filter" target="_blank" rel="noopener">Model card ↗</a>
+        <a href="https://github.com/openai/privacy-filter" target="_blank" rel="noopener">Source ↗</a>
+        <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener">Transformers.js ↗</a>
+      </div>
+    </div>
+    <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  </header>
+
+  <section class="card">
+    <div class="card-b">
+      <div class="model-bar">
+        <div class="field">
+          <label for="device">Device</label>
+          <select id="device">
+            <option value="webgpu">WebGPU (fast)</option>
+            <option value="wasm">WASM (CPU)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dtype">Precision</label>
+          <select id="dtype">
+            <option value="q4">q4: ~0.9 GB</option>
+            <option value="q4f16">q4f16: ~0.8 GB (WebGPU w/ fp16)</option>
+            <option value="q8">q8: ~1.6 GB</option>
+            <option value="fp16">fp16: ~2.8 GB</option>
+          </select>
+        </div>
+        <button class="btn primary" id="loadBtn">Load model</button>
+      </div>
+      <div class="progress" id="progress"><div></div></div>
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">Model not loaded. The first load downloads the weights, then your browser caches them.</span></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-h">
+        <h2>Input</h2>
+        <span class="hint" id="charCount">0 chars</span>
+      </div>
+      <div class="card-b">
+        <div class="samples" id="samples"></div>
+        <textarea id="input" spellcheck="false" placeholder="Paste text containing names, emails, phone numbers, addresses, account numbers, API keys…"></textarea>
+        <div class="row">
+          <span class="hint"><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost" id="clearBtn">Clear</button>
+            <button class="btn primary" id="runBtn" disabled>Detect PII</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-view="highlight" aria-selected="true">Highlight</button>
+          <button class="tab" role="tab" data-view="redact" aria-selected="false">Redacted</button>
+          <button class="tab" role="tab" data-view="table" aria-selected="false">Entities</button>
+          <button class="tab" role="tab" data-view="json" aria-selected="false">JSON</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="redactMode" title="Redaction style" style="min-height:30px;padding:3px 8px;font-size:13px">
+            <option value="label">[LABEL]</option>
+            <option value="numbered">[LABEL_n]</option>
+            <option value="mask">█████</option>
+          </select>
+          <button class="btn sm" id="copyBtn">Copy</button>
+        </div>
+      </div>
+      <div class="card-b">
+        <div class="legend" id="legend"></div>
+        <div class="out empty" id="output">Load the model, then run detection on some text.</div>
+        <div class="row">
+          <div class="stats" id="stats"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <details class="card adv" id="adv">
+    <summary>Decoding settings</summary>
+    <div class="adv-body">
+      <div class="field">
+        <label for="decodeMode">Decoder</label>
+        <select id="decodeMode">
+          <option value="viterbi">Constrained Viterbi (BIOES), as in the official runtime</option>
+          <option value="argmax">Per-token argmax</option>
+        </select>
+      </div>
+      <div class="slider">
+        <label for="minScore">Min span score <output id="minScoreOut">0.00</output></label>
+        <input type="range" id="minScore" min="0" max="1" step="0.01" value="0">
+      </div>
+      <div id="biasSliders" style="display:contents"></div>
+      <div class="adv-foot">
+        <span class="hint">Presets:</span>
+        <button class="btn sm" data-preset="default">Default</button>
+        <button class="btn sm" data-preset="recall">Higher recall</button>
+        <button class="btn sm" data-preset="precision">Higher precision</button>
+        <span class="hint">Changes re-decode the cached logits instantly; the model doesn't run again.</span>
+      </div>
+    </div>
+  </details>
+
+  <footer>
+    Privacy Filter is a redaction aid, not an anonymization or compliance guarantee. It is English-focused and can miss or over-redact entities. Model © OpenAI, Apache-2.0.
+  </footer>
+</div>
+
+<!-- Inference runs in a module worker so the page stays responsive during load and inference. -->
+<script id="worker-src" type="text/plain">
+import { AutoTokenizer, AutoModelForTokenClassification, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js";
+
+env.allowLocalModels = false;
+const MODEL_ID = "openai/privacy-filter";
+let tokenizer = null, model = null;
+
+// Map each token to a [start, end) character range in the original text.
+// Tokens are byte-level BPE, so a multi-byte character can be split across
+// tokens; those are buffered until they decode to a complete string.
+function computeOffsets(text, ids) {
+  const offsets = new Array(ids.length);
+  let cursor = 0, buf = [], pending = [];
+  for (let j = 0; j < ids.length; j++) {
+    buf.push(ids[j]); pending.push(j);
+    let piece = tokenizer.decode(buf, { skip_special_tokens: true, clean_up_tokenization_spaces: false });
+    if (piece === "") { for (const p of pending) offsets[p] = [cursor, cursor]; buf = []; pending = []; continue; }
+    if (piece.includes("�") && j < ids.length - 1 && !text.startsWith(piece, cursor)) continue;
+    let start = cursor;
+    if (!text.startsWith(piece, cursor)) {
+      if (piece[0] === " " && text.startsWith(piece.slice(1), cursor)) piece = piece.slice(1);
+      else {
+        const idx = text.indexOf(piece.trim(), cursor);
+        if (idx >= 0 && idx - cursor < 8) { start = idx; piece = piece.trim(); }
+      }
+    }
+    const end = Math.min(text.length, start + piece.length);
+    for (const p of pending) offsets[p] = [start, end];
+    cursor = end; buf = []; pending = [];
+  }
+  return offsets;
+}
+
+function logSoftmax(data, T, C) {
+  const out = new Float32Array(T * C);
+  for (let t = 0; t < T; t++) {
+    let m = -Infinity;
+    for (let c = 0; c < C; c++) m = Math.max(m, data[t * C + c]);
+    let s = 0;
+    for (let c = 0; c < C; c++) s += Math.exp(data[t * C + c] - m);
+    const lse = m + Math.log(s);
+    for (let c = 0; c < C; c++) out[t * C + c] = data[t * C + c] - lse;
+  }
+  return out;
+}
+
+self.onmessage = async ({ data: msg }) => {
+  try {
+    if (msg.type === "load") {
+      const files = {};
+      const progress_callback = (p) => {
+        if (p.status === "progress" && p.file) {
+          files[p.file] = { loaded: p.loaded || 0, total: p.total || 0 };
+          let loaded = 0, total = 0;
+          for (const f of Object.values(files)) { loaded += f.loaded; total += f.total; }
+          self.postMessage({ type: "progress", loaded, total, file: p.file });
+        }
+      };
+      self.postMessage({ type: "status", text: "Loading tokenizer…" });
+      tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, { progress_callback });
+      self.postMessage({ type: "status", text: "Downloading model weights…" });
+      model = await AutoModelForTokenClassification.from_pretrained(MODEL_ID, {
+        device: msg.device, dtype: msg.dtype, progress_callback,
+      });
+      self.postMessage({ type: "status", text: "Warming up…" });
+      const warm = tokenizer("Hello, my name is Alice.");
+      await model(warm);
+      self.postMessage({ type: "loaded", id2label: model.config.id2label });
+    } else if (msg.type === "run") {
+      const t0 = performance.now();
+      const inputs = tokenizer(msg.text);
+      const ids = Array.from(inputs.input_ids.data, Number);
+      const t1 = performance.now();
+      const { logits } = await model(inputs);
+      const t2 = performance.now();
+      const [, T, C] = logits.dims;
+      const raw = logits.type === "float32" ? logits.data : Float32Array.from(logits.data, Number);
+      const logprobs = logSoftmax(raw, T, C);
+      const offsets = computeOffsets(msg.text, ids);
+      self.postMessage({
+        type: "result", runId: msg.runId, ids, offsets, logprobs, T, C,
+        timing: { tokenize: t1 - t0, infer: t2 - t1 },
+      }, [logprobs.buffer]);
+    }
+  } catch (err) {
+    self.postMessage({ type: "error", message: String(err?.message || err), runId: msg.runId });
+  }
+};
+</script>
+
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const CATS = ["account_number", "private_address", "private_date", "private_email", "private_person", "private_phone", "private_url", "secret"];
+const NICE = {
+  account_number: "Account number", private_address: "Address", private_date: "Date", private_email: "Email",
+  private_person: "Person", private_phone: "Phone", private_url: "URL", secret: "Secret",
+};
+const BIAS_KEYS = [
+  ["transition_bias_background_stay", "Background → stay"],
+  ["transition_bias_background_to_start", "Background → span start"],
+  ["transition_bias_inside_to_continue", "Inside → continue"],
+  ["transition_bias_inside_to_end", "Inside → end"],
+  ["transition_bias_end_to_background", "End → background"],
+  ["transition_bias_end_to_start", "End → new span"],
+];
+// "default" matches viterbi_calibration.json shipped with the model; the others are illustrative nudges.
+const PRESETS = {
+  default: {},
+  recall: { transition_bias_background_to_start: 1.5, transition_bias_inside_to_continue: 1.0, transition_bias_background_stay: -0.5 },
+  precision: { transition_bias_background_to_start: -1.5, transition_bias_inside_to_end: 0.75, transition_bias_background_stay: 0.5 },
+};
+const SAMPLES = {
+  "Email": `Hi team,
+
+Please loop in Maria Gonzalez (maria.gonzalez@acme-corp.com, +1 (415) 555-0137) on the renewal.
+Her office moved to 2210 Mission Street, Apt 4B, San Francisco, CA 94110 as of March 3, 2024.
+
+Thanks,
+David Chen`,
+  "Support ticket": `Customer: Priya Raman
+DOB: 07/14/1988
+Account #: 4532-8812-0091-7754
+Phone: 020 7946 0958
+Notes: Customer reported she could not log in at https://portal.example.com/users/priya-raman-88/settings.
+Reset link sent to priya.r88@gmail.com on 2025-01-09.`,
+  "Code / secrets": `# deploy config
+export OPENAI_API_KEY="sk-proj-9fJ2kLm3Qx7Rt0vB8nYzW4aP1cE6dH5gU"
+export DB_URL="postgres://admin:Tr0ub4dor&3@10.2.14.7:5432/prod"
+# owner: jonathan.miller@initech.io  (on-call: Jon Miller, 555-201-8890)
+AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY`,
+  "Medical note": `Patient Robert "Bobby" Okafor, seen on 12 Feb 2025 at the clinic on 88 Elm Grove Rd, Leeds LS6 2AB.
+Emergency contact: wife, Adaeze Okafor, 07700 900461.
+Insurance member ID: HX-77310-442. Follow-up scheduled for next Tuesday.`,
+};
+
+const state = {
+  ready: false, busy: false, id2label: null, result: null, text: "", spans: [],
+  view: "highlight", enabled: new Set(CATS), biases: {}, runId: 0,
+};
+for (const [k] of BIAS_KEYS) state.biases[k] = 0;
+
+// ---------- Worker ----------
+const workerUrl = URL.createObjectURL(new Blob([$("#worker-src").textContent], { type: "text/javascript" }));
+const worker = new Worker(workerUrl, { type: "module" });
+
+function setStatus(text, kind = "") {
+  $("#statusText").textContent = text;
+  $("#dot").className = "dot " + kind;
+}
+const fmtMB = (b) => (b / 1e6).toFixed(0) + " MB";
+
+worker.onmessage = ({ data: m }) => {
+  if (m.type === "status") setStatus(m.text, "busy");
+  else if (m.type === "progress") {
+    const pct = m.total ? (m.loaded / m.total) * 100 : 0;
+    $("#progress").style.display = "block";
+    $("#progress > div").style.width = pct.toFixed(1) + "%";
+    setStatus(`Downloading ${fmtMB(m.loaded)} / ${fmtMB(m.total)} (${pct.toFixed(0)}%)`, "busy");
+  } else if (m.type === "loaded") {
+    state.ready = true; state.id2label = m.id2label;
+    $("#progress").style.display = "none";
+    setStatus(`Model ready on ${$("#device").value.toUpperCase()} (${$("#dtype").value}).`, "ok");
+    $("#loadBtn").textContent = "Reload";
+    $("#loadBtn").disabled = false;
+    $("#runBtn").disabled = false;
+    if ($("#input").value.trim()) run();
+  } else if (m.type === "result") {
+    if (m.runId !== state.runId) return;
+    state.busy = false; $("#runBtn").disabled = false; $("#runBtn").textContent = "Detect PII";
+    state.result = m;
+    setStatus("Model ready.", "ok");
+    decodeAndRender();
+  } else if (m.type === "error") {
+    state.busy = false; $("#runBtn").disabled = !state.ready; $("#runBtn").textContent = "Detect PII";
+    $("#loadBtn").disabled = false;
+    $("#progress").style.display = "none";
+    setStatus("Error: " + m.message, "err");
+    if (!state.ready && $("#device").value === "webgpu") {
+      setStatus("Error: " + m.message + ". Try switching Device to WASM or Precision to q4.", "err");
+    }
+  }
+};
+worker.onerror = (e) => setStatus("Worker error: " + (e.message || "failed to start"), "err");
+
+// ---------- Decoding (mirrors opf/_core/decoding.py) ----------
+function labelInfo(idx) {
+  if (idx === 0) return { tag: "O", cat: null };
+  const name = state.id2label?.[idx] ?? "O";
+  if (name === "O") return { tag: "O", cat: null };
+  return { tag: name[0], cat: name.slice(2) };
+}
+
+function buildTransitions(C, b) {
+  const NEG = -1e9;
+  const start = new Float32Array(C).fill(NEG), end = new Float32Array(C).fill(NEG);
+  const trans = new Float32Array(C * C).fill(NEG);
+  const info = Array.from({ length: C }, (_, i) => labelInfo(i));
+  for (let i = 0; i < C; i++) {
+    const p = info[i];
+    if (p.tag === "O" || p.tag === "B" || p.tag === "S") start[i] = 0;
+    if (p.tag === "O" || p.tag === "E" || p.tag === "S") end[i] = 0;
+    for (let j = 0; j < C; j++) {
+      const n = info[j];
+      let ok = false, bias = 0;
+      if (p.tag === "O") {
+        ok = n.tag === "O" || n.tag === "B" || n.tag === "S";
+        bias = n.tag === "O" ? b.transition_bias_background_stay : b.transition_bias_background_to_start;
+      } else if (p.tag === "E" || p.tag === "S") {
+        ok = n.tag === "O" || n.tag === "B" || n.tag === "S";
+        bias = n.tag === "O" ? b.transition_bias_end_to_background : b.transition_bias_end_to_start;
+      } else if (p.tag === "B" || p.tag === "I") {
+        ok = p.cat === n.cat && (n.tag === "I" || n.tag === "E");
+        bias = n.tag === "I" ? b.transition_bias_inside_to_continue : b.transition_bias_inside_to_end;
+      }
+      if (ok) trans[i * C + j] = bias || 0;
+    }
+  }
+  return { start, end, trans };
+}
+
+function viterbi(lp, T, C, biases) {
+  if (T === 0) return [];
+  const { start, end, trans } = buildTransitions(C, biases);
+  let scores = new Float32Array(C);
+  for (let c = 0; c < C; c++) scores[c] = lp[c] + start[c];
+  const back = new Int32Array((T - 1) * C);
+  for (let t = 1; t < T; t++) {
+    const next = new Float32Array(C);
+    for (let j = 0; j < C; j++) {
+      let best = -Infinity, arg = 0;
+      for (let i = 0; i < C; i++) {
+        const s = scores[i] + trans[i * C + j];
+        if (s > best) { best = s; arg = i; }
+      }
+      next[j] = best + lp[t * C + j];
+      back[(t - 1) * C + j] = arg;
+    }
+    scores = next;
+  }
+  let last = 0, best = -Infinity;
+  for (let c = 0; c < C; c++) { const s = scores[c] + end[c]; if (s > best) { best = s; last = c; } }
+  if (!(best > -1e8)) return argmax(lp, T, C);
+  const path = new Array(T);
+  path[T - 1] = last;
+  for (let t = T - 2; t >= 0; t--) { last = back[t * C + last]; path[t] = last; }
+  return path;
+}
+
+function argmax(lp, T, C) {
+  const path = new Array(T);
+  for (let t = 0; t < T; t++) {
+    let best = -Infinity, arg = 0;
+    for (let c = 0; c < C; c++) if (lp[t * C + c] > best) { best = lp[t * C + c]; arg = c; }
+    path[t] = arg;
+  }
+  return path;
+}
+
+// Group BIOES token labels into character spans.
+function toSpans(path, r, text) {
+  const spans = [];
+  let open = null;
+  const close = () => { if (open) { spans.push(open); open = null; } };
+  for (let t = 0; t < path.length; t++) {
+    const { tag, cat } = labelInfo(path[t]);
+    const [s, e] = r.offsets[t] || [0, 0];
+    const prob = Math.exp(r.logprobs[t * r.C + path[t]]);
+    if (tag === "O") { close(); continue; }
+    const extend = open && open.cat === cat && (tag === "I" || tag === "E");
+    if (extend) { open.end = Math.max(open.end, e); open.probs.push(prob); }
+    else { close(); open = { cat, start: s, end: e, probs: [prob] }; }
+    if (tag === "E" || tag === "S") close();
+  }
+  close();
+  return spans.map((sp) => {
+    let { start, end } = sp;
+    while (start < end && /\s/.test(text[start])) start++;
+    while (end > start && /\s/.test(text[end - 1])) end--;
+    const score = sp.probs.reduce((a, b) => a + b, 0) / sp.probs.length;
+    return { label: sp.cat, start, end, text: text.slice(start, end), score };
+  }).filter((s) => s.end > s.start);
+}
+
+function decodeAndRender() {
+  const r = state.result;
+  if (!r) return;
+  const path = $("#decodeMode").value === "viterbi" ? viterbi(r.logprobs, r.T, r.C, state.biases) : argmax(r.logprobs, r.T, r.C);
+  state.spans = toSpans(path, r, state.text);
+  const total = r.timing.tokenize + r.timing.infer;
+  $("#stats").innerHTML =
+    `<span><b>${r.T}</b> tokens</span><span><b>${state.spans.length}</b> spans</span>` +
+    `<span>inference <b>${r.timing.infer.toFixed(0)} ms</b></span><span>total <b>${total.toFixed(0)} ms</b></span>`;
+  render();
+}
+
+// ---------- Rendering ----------
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const visibleSpans = () => {
+  const min = +$("#minScore").value;
+  return state.spans.filter((s) => state.enabled.has(s.label) && s.score >= min);
+};
+
+function renderLegend() {
+  const counts = {};
+  for (const s of state.spans) counts[s.label] = (counts[s.label] || 0) + 1;
+  $("#legend").innerHTML = CATS.map((c) =>
+    `<span class="chip" role="button" tabindex="0" data-cat="${c}" aria-pressed="${state.enabled.has(c)}" style="--c:var(--c-${c})">` +
+    `<span class="sw"></span>${NICE[c]}<span class="n">${counts[c] || 0}</span></span>`).join("");
+}
+
+function redactedText(spans) {
+  const mode = $("#redactMode").value;
+  const numbering = {}, seen = {};
+  let out = "", html = "", pos = 0;
+  for (const s of spans) {
+    let rep;
+    if (mode === "mask") rep = "█".repeat([...s.text].length);
+    else if (mode === "numbered") {
+      const key = s.label + "\u0000" + s.text;
+      if (!seen[key]) { numbering[s.label] = (numbering[s.label] || 0) + 1; seen[key] = numbering[s.label]; }
+      rep = `[${s.label.toUpperCase()}_${seen[key]}]`;
+    } else rep = `[${s.label.toUpperCase()}]`;
+    const before = state.text.slice(pos, s.start);
+    out += before + rep;
+    html += esc(before) + `<span class="redact" style="--c:var(--c-${s.label});--bg-c:var(--c-${s.label}-bg)">${esc(rep)}</span>`;
+    pos = s.end;
+  }
+  out += state.text.slice(pos);
+  html += esc(state.text.slice(pos));
+  return { out, html };
+}
+
+function render() {
+  renderLegend();
+  const el = $("#output");
+  if (!state.result) return;
+  const spans = visibleSpans();
+  el.classList.remove("empty");
+  if (state.view === "highlight") {
+    let html = "", pos = 0;
+    for (const s of spans) {
+      html += esc(state.text.slice(pos, s.start));
+      html += `<mark class="ent" style="--c:var(--c-${s.label});--bg-c:var(--c-${s.label}-bg)" title="${NICE[s.label]} · score ${s.score.toFixed(3)}">` +
+        `${esc(s.text)}<span class="tag">${NICE[s.label]}</span></mark>`;
+      pos = s.end;
+    }
+    el.innerHTML = html + esc(state.text.slice(pos));
+  } else if (state.view === "redact") {
+    el.innerHTML = redactedText(spans).html;
+  } else if (state.view === "table") {
+    if (!spans.length) { el.innerHTML = `<span class="hint">No entities detected.</span>`; return; }
+    el.style.whiteSpace = "normal";
+    el.innerHTML = `<table><thead><tr><th>Label</th><th>Text</th><th>Score</th><th>Chars</th></tr></thead><tbody>` +
+      spans.map((s) => `<tr><td><span class="badge" style="--c:var(--c-${s.label});--bg-c:var(--c-${s.label}-bg)">${NICE[s.label]}</span></td>` +
+        `<td class="mono">${esc(s.text)}</td>` +
+        `<td class="num"><span class="bar"><i style="width:${(s.score * 100).toFixed(0)}%"></i></span>${s.score.toFixed(3)}</td>` +
+        `<td class="num">${s.start}–${s.end}</td></tr>`).join("") + `</tbody></table>`;
+    return;
+  } else {
+    el.textContent = JSON.stringify(spans.map((s) => ({ ...s, score: +s.score.toFixed(5) })), null, 2);
+  }
+  el.style.whiteSpace = "";
+}
+
+function copyText() {
+  const spans = visibleSpans();
+  if (state.view === "json") return JSON.stringify(spans, null, 2);
+  if (state.view === "table") return spans.map((s) => `${s.label}\t${s.text}\t${s.score.toFixed(4)}\t${s.start}\t${s.end}`).join("\n");
+  if (state.view === "redact") return redactedText(spans).out;
+  return state.text;
+}
+
+// ---------- Actions ----------
+function load() {
+  state.ready = false;
+  $("#runBtn").disabled = true;
+  $("#loadBtn").disabled = true;
+  $("#progress > div").style.width = "0%";
+  setStatus("Starting…", "busy");
+  worker.postMessage({ type: "load", device: $("#device").value, dtype: $("#dtype").value });
+}
+
+function run() {
+  const text = $("#input").value;
+  if (!state.ready || !text.trim()) return;
+  state.text = text; state.busy = true; state.runId++;
+  $("#runBtn").disabled = true; $("#runBtn").textContent = "Running…";
+  setStatus("Running inference…", "busy");
+  worker.postMessage({ type: "run", text, runId: state.runId });
+}
+
+// ---------- Wiring ----------
+(async () => {
+  let hasGPU = false;
+  try { hasGPU = !!(navigator.gpu && await navigator.gpu.requestAdapter()); } catch {}
+  if (!hasGPU) {
+    $("#device").value = "wasm";
+    $("#device").querySelector('[value="webgpu"]').textContent = "WebGPU (unavailable)";
+    $("#device").querySelector('[value="webgpu"]').disabled = true;
+  }
+})();
+
+$("#samples").innerHTML = Object.keys(SAMPLES).map((k) => `<button class="btn sm" data-sample="${esc(k)}">${esc(k)}</button>`).join("");
+$("#samples").addEventListener("click", (e) => {
+  const k = e.target.closest("[data-sample]")?.dataset.sample;
+  if (!k) return;
+  $("#input").value = SAMPLES[k];
+  updateCount();
+  run();
+});
+const updateCount = () => { $("#charCount").textContent = `${$("#input").value.length.toLocaleString()} chars`; };
+$("#input").addEventListener("input", updateCount);
+$("#input").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); } });
+$("#loadBtn").addEventListener("click", load);
+$("#runBtn").addEventListener("click", run);
+$("#clearBtn").addEventListener("click", () => { $("#input").value = ""; updateCount(); $("#input").focus(); });
+
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", x === t));
+  state.view = t.dataset.view;
+  render();
+}));
+$("#redactMode").addEventListener("change", render);
+$("#copyBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(copyText()); $("#copyBtn").textContent = "Copied"; }
+  catch { $("#copyBtn").textContent = "Copy failed"; }
+  setTimeout(() => ($("#copyBtn").textContent = "Copy"), 1200);
+});
+const toggleChip = (e) => {
+  const c = e.target.closest("[data-cat]")?.dataset.cat;
+  if (!c) return;
+  state.enabled.has(c) ? state.enabled.delete(c) : state.enabled.add(c);
+  render();
+};
+$("#legend").addEventListener("click", toggleChip);
+$("#legend").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleChip(e); } });
+
+$("#biasSliders").innerHTML = BIAS_KEYS.map(([k, name]) =>
+  `<div class="slider"><label for="${k}">${name} <output id="${k}-out">0.00</output></label>` +
+  `<input type="range" id="${k}" data-bias="${k}" min="-5" max="5" step="0.05" value="0"></div>`).join("");
+function setBias(k, v) {
+  state.biases[k] = v;
+  $("#" + k).value = v;
+  $(`#${k}-out`).textContent = v.toFixed(2);
+}
+$("#biasSliders").addEventListener("input", (e) => {
+  const k = e.target.dataset.bias;
+  if (!k) return;
+  setBias(k, +e.target.value);
+  decodeAndRender();
+});
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+  const p = PRESETS[b.dataset.preset];
+  for (const [k] of BIAS_KEYS) setBias(k, p[k] || 0);
+  decodeAndRender();
+}));
+$("#decodeMode").addEventListener("change", decodeAndRender);
+$("#minScore").addEventListener("input", () => { $("#minScoreOut").textContent = (+$("#minScore").value).toFixed(2); render(); });
+
+$("#themeBtn").addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("pf-theme", root.dataset.theme); } catch {}
+});
+try { const t = localStorage.getItem("pf-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+
+$("#input").value = SAMPLES["Email"];
+updateCount();
+renderLegend();
+</script>
+</body>
+</html>
